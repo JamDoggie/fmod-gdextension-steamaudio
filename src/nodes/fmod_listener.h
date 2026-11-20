@@ -9,7 +9,7 @@ namespace godot {
     template<class Derived, class NodeType>
     class FmodListener : public NodeType {
 
-        void ready();
+        void enter_tree();
         void exit_tree();
 
     public:
@@ -47,8 +47,8 @@ namespace godot {
         if (Engine::get_singleton()->is_editor_hint()) { return; }
 #endif
         switch(p_what){
-            case Node::NOTIFICATION_READY:
-                ready();
+            case Node::NOTIFICATION_ENTER_TREE:
+                enter_tree();
                 break;
             case Node::NOTIFICATION_EXIT_TREE:
                 exit_tree();
@@ -59,7 +59,7 @@ namespace godot {
     }
 
     template<class Derived, class NodeType>
-    void FmodListener<Derived, NodeType>::ready() {
+    void FmodListener<Derived, NodeType>::enter_tree() {
 #ifdef TOOLS_ENABLED
         // ensure we only run FMOD when the game is running!
         if (Engine::get_singleton()->is_editor_hint()) { return; }
@@ -147,7 +147,7 @@ namespace godot {
         ClassDB::bind_method(D_METHOD("get_listener_index"), &Derived::get_listener_index);
         ClassDB::bind_method(D_METHOD("set_locked", "locked"), &Derived::set_locked);
         ClassDB::bind_method(D_METHOD("get_locked"), &Derived::get_locked);
-        ClassDB::bind_method(D_METHOD("set_listener_weight", "p_weight"), &Derived::set_listener_weight);
+        ClassDB::bind_method(D_METHOD("set_listener_weight", "weight"), &Derived::set_listener_weight);
         ClassDB::bind_method(D_METHOD("get_listener_weight"), &Derived::get_listener_weight);
 
         ADD_PROPERTY(
@@ -176,8 +176,8 @@ namespace godot {
           PropertyInfo(
             Variant::FLOAT,
             "weight",
-            PROPERTY_HINT_NONE,
-            "",
+            PROPERTY_HINT_RANGE,
+            "0,1,0.01",
             PROPERTY_USAGE_DEFAULT
           ),
           "set_listener_weight",

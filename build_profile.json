@@ -1,0 +1,32 @@
+{
+  "enabled_classes": [
+    "Object",
+    "RefCounted",
+    "Resource",
+
+    "Node",
+    "CanvasItem",
+    "Node2D",
+    "Node3D",
+    "SceneTree",
+    "Window",
+
+    "Engine",
+    "OS",
+    "DisplayServer",
+    "ProjectSettings",
+    "Performance",
+    "FileAccess",
+    "DirAccess",
+    "ResourceLoader",
+
+    "AudioFrame",
+    "AudioStream",
+    "AudioStreamPlayer",
+    "AudioStreamPlaybackResampled",
+
+    "EditorPlugin",
+    "EditorExportPlugin",
+    "EditorExportPlatform"
+  ]
+}

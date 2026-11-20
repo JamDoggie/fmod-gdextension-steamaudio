@@ -1,0 +1,55 @@
+name: 🧪 Desktop Tests
+on:
+  workflow_call:
+    inputs:
+      godot-version:
+        type: string
+        required: true
+      platform:
+        type: string
+        required: true
+
+jobs:
+  test:
+    runs-on: ${{ fromJSON('{"linux":"ubuntu-22.04","macos":"macos-15","windows":"windows-2022"}')[inputs.platform] }}
+    name: ${{ matrix.mode }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [editor, export-release, export-debug]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/download-godot
+        with:
+          version: ${{ inputs.godot-version }}
+          platform: ${{ inputs.platform }}
+          destination: ${{ runner.temp }}/godot
+
+      - name: Install export template
+        if: matrix.mode != 'editor'
+        uses: ./.github/actions/download-godot
+        with:
+          version: ${{ inputs.godot-version }}
+          platform: ${{ inputs.platform }}
+          destination: ${{ runner.temp }}/godot
+          template: ${{ matrix.mode == 'export-debug' && 'debug' || 'release' }}
+
+      - name: Download libraries
+        uses: actions/download-artifact@v7
+        with:
+          name: fmod-gdextension-${{ inputs.platform }}
+          path: demo/addons/fmod/libs/${{ inputs.platform }}
+
+      - name: Run tests
+        timeout-minutes: 20
+        run: |
+          godot="$(find "$RUNNER_TEMP/godot" -maxdepth 1 -name 'godot.*.console.exe' | head -n 1)"
+          [ -n "$godot" ] || godot="$(find "$RUNNER_TEMP/godot" -maxdepth 1 -name 'godot.*' | head -n 1)"
+          cd demo
+          ./run_tests.sh "$godot" ${{ matrix.mode }}

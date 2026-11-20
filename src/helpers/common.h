@@ -3,13 +3,16 @@
 
 #include "classes/canvas_item.hpp"
 #include "classes/node3d.hpp"
+#include "classes/ref.hpp"
 #include "fmod_common.h"
 #include "variant/utility_functions.hpp"
 
 #include <fmod_errors.h>
+#include <fmod_studio.h>
 #include <fmod_studio_common.h>
 #include <helpers/current_function.h>
 
+#include <cstdio>
 #include <godot.hpp>
 #include <variant/utility_functions.hpp>
 
@@ -22,9 +25,15 @@
 #define GODOT_LOG_ERROR(message) UtilityFunctions::push_error(message, BOOST_CURRENT_FUNCTION, __FILE__, __LINE__);
 
 #define ERROR_CHECK_WITH_REASON(_result, _reason) \
-(((_result) != FMOD_OK) ? (godot::UtilityFunctions::push_error(_reason, BOOST_CURRENT_FUNCTION, __FILE__, __LINE__), false) : true)
+    (((_result) != FMOD_OK) ? (godot::UtilityFunctions::push_error(_reason, BOOST_CURRENT_FUNCTION, __FILE__, __LINE__), false) : true)
 
 #define ERROR_CHECK(_result) ((_result) == FMOD_OK)
+
+// Fmod enums and bitfields take FMOD's constants as values: converting between one and its FMOD type keeps the value.
+template<class TTarget, class TSource>
+inline TTarget fmod_enum_cast(TSource p_value) {
+    return static_cast<TTarget>(static_cast<int64_t>(p_value));
+}
 
 #define FMODCLASS(m_class, m_inherits, m_owned)               \
     GDCLASS(m_class, m_inherits)                              \
@@ -66,10 +75,12 @@ public:                                                                  \
         if (wrapped) {                                                   \
             ref.instantiate();                                           \
             ref->_wrapped = wrapped;                                     \
+            /* Without the strings bank, getPath fails and leaves path unset. */ \
             char path[MAX_PATH_SIZE];                                    \
-            ERROR_CHECK(wrapped->getPath(path, MAX_PATH_SIZE, nullptr)); \
+            if (ERROR_CHECK(wrapped->getPath(path, MAX_PATH_SIZE, nullptr))) { \
+                ref->_path = String(path);                               \
+            }                                                            \
             ERROR_CHECK(wrapped->getID(&ref->_guid));                    \
-            ref->_path = String(path);                                   \
         }                                                                \
         return ref;                                                      \
     }                                                                    \
@@ -141,21 +152,29 @@ namespace godot {
     }
 
     static inline FMOD_GUID string_to_fmod_guid(const char* guid) {
-        FMOD_GUID result;
-        sscanf(guid,
-               "{%8x-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx}",
-               &result.Data1, &result.Data2, &result.Data3,
-               &result.Data4[0], &result.Data4[1], &result.Data4[2], &result.Data4[3],
-               &result.Data4[4], &result.Data4[5], &result.Data4[6], &result.Data4[7]);
+        FMOD_GUID result = {};
+        if (FMOD_Studio_ParseID(guid, &result) != FMOD_OK) { return {}; }
         return result;
     }
 
     static inline String fmod_guid_to_string(const FMOD_GUID& guid) {
         char result[39];
-        snprintf(result, sizeof(result), "{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
-                 guid.Data1, guid.Data2, guid.Data3,
-                 guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
-                 guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+        snprintf(
+          result,
+          sizeof(result),
+          "{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+          guid.Data1,
+          guid.Data2,
+          guid.Data3,
+          guid.Data4[0],
+          guid.Data4[1],
+          guid.Data4[2],
+          guid.Data4[3],
+          guid.Data4[4],
+          guid.Data4[5],
+          guid.Data4[6],
+          guid.Data4[7]
+        );
         return result;
     }
 
@@ -172,17 +191,10 @@ namespace godot {
     }
 
     static inline bool equals(const FMOD_GUID& first, const FMOD_GUID& second) {
-        return first.Data1 == second.Data1
-        && first.Data2 == second.Data2
-        && first.Data3 == second.Data3
-        && first.Data4[0] == second.Data4[0]
-        && first.Data4[1] == second.Data4[1]
-        && first.Data4[2] == second.Data4[2]
-        && first.Data4[3] == second.Data4[3]
-        && first.Data4[4] == second.Data4[4]
-        && first.Data4[5] == second.Data4[5]
-        && first.Data4[6] == second.Data4[6]
-        && first.Data4[7] == second.Data4[7];
+        return first.Data1 == second.Data1 && first.Data2 == second.Data2 && first.Data3 == second.Data3
+            && first.Data4[0] == second.Data4[0] && first.Data4[1] == second.Data4[1] && first.Data4[2] == second.Data4[2]
+            && first.Data4[3] == second.Data4[3] && first.Data4[4] == second.Data4[4] && first.Data4[5] == second.Data4[5]
+            && first.Data4[6] == second.Data4[6] && first.Data4[7] == second.Data4[7];
     }
 }// namespace godot
 

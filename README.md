@@ -1,6 +1,6 @@
 ![logo](docs/src/doc/assets/fmod-gdextension-logo.png)
 
-[![🌈 Build](https://github.com/utopia-rise/fmod-gdextension/actions/workflows/release.yml/badge.svg)](https://github.com/utopia-rise/fmod-gdextension/actions/workflows/release.yml) 
+[![🌈 CI](https://github.com/utopia-rise/fmod-gdextension/actions/workflows/trigger_ci.yml/badge.svg)](https://github.com/utopia-rise/fmod-gdextension/actions/workflows/trigger_ci.yml) 
 [![](https://img.shields.io/discord/1012326818365325352.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.com/invite/u2NM2vTGMn)
 ---
 
@@ -33,9 +33,6 @@ This GDExtension provides nodes such as `FmodEventEmitter2D`, `FmodEventEmitter3
 
 # Contributing
 
-In order to be able to PR this repo from a fork, you need to add `FMODUSER` and `FMODPASS` secrets to your fork repo.  
-This enables CI to download FMOD api.
-
 Feel free to raise pull requests. We hope you'll enjoy this addon!
 
 ## How this extension works
@@ -58,8 +55,8 @@ work to GDNative.
 
 # Tested Versions
 
-- **Godot Version:** 4.4 stable
-- **FMOD Version:** 2.03
+- **Godot Version:** 4.6 and later 4.x
+- **FMOD Version:** 2.04.00
 
 [fmodsingleton]: .README/fmodsingleton.png
 [usecustombuild]: .README/usecustombuild.png

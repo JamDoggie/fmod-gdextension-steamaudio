@@ -2,26 +2,75 @@
 
 #include "fmod_server.h"
 #include "fmod_string_names.h"
+#include "helpers/common.h"
 
 #include <classes/engine.hpp>
+#include <classes/file_access.hpp>
 
 using namespace godot;
 
 void FmodBankLoader::_enter_tree() {
+    load_banks(banks);
+}
+
+void FmodBankLoader::_exit_tree() {
+    unload_banks(banks);
+}
+
+void FmodBankLoader::load_banks(Vector<Ref<FmodBank>>& p_banks) {
 #ifdef TOOLS_ENABLED
-    if (Engine::get_singleton()->is_editor_hint()) {
-        return;
-    }
+    if (Engine::get_singleton()->is_editor_hint()) { return; }
 #endif
     for (int i = 0; i < bank_paths.size(); ++i) {
-        bank.append(
-          FmodServer::get_singleton()->load_bank(bank_paths[i], FMOD_STUDIO_LOAD_BANK_NORMAL)
-        );
+        Ref<FmodBank> loaded_bank = FmodServer::get_singleton()->load_bank(bank_paths[i], FmodBank::NORMAL);
+        if (loaded_bank.is_null()) { continue; }
+        if (preload_sample_data) { loaded_bank->load_sample_data(); }
+        p_banks.append(loaded_bank);
     }
 }
 
+void FmodBankLoader::unload_banks(Vector<Ref<FmodBank>>& p_banks) {
+    if (preload_sample_data) {
+        for (const Ref<FmodBank>& loaded_bank : p_banks) {
+            loaded_bank->unload_sample_data();
+        }
+    }
+    p_banks.clear();
+}
+
 void FmodBankLoader::set_bank_paths(const Array& p_paths) {
+#ifdef TOOLS_ENABLED
+    if (Engine::get_singleton()->is_editor_hint()) {
+        for (int i = 0; i < p_paths.size(); ++i) {
+            // Opening the file is what makes Godot report a case mismatch on a case-insensitive file system.
+            if (FileAccess::open(p_paths[i], FileAccess::READ).is_null()) {
+                GODOT_LOG_WARNING(vformat("Bank %s cannot be opened. Check that it exists, with the case of every folder and file name: paths are case-sensitive in exported projects and on Linux, Android and the web.", p_paths[i]))
+            }
+        }
+    }
+#endif
     bank_paths = p_paths;
+    if (!is_inside_tree()) { return; }
+    Vector<Ref<FmodBank>> previous_banks = banks;
+    banks.clear();
+    load_banks(banks);
+    unload_banks(previous_banks);
+}
+
+void FmodBankLoader::set_preload_sample_data(bool p_preload_sample_data) {
+    if (preload_sample_data == p_preload_sample_data) { return; }
+    preload_sample_data = p_preload_sample_data;
+    for (const Ref<FmodBank>& loaded_bank : banks) {
+        if (preload_sample_data) {
+            loaded_bank->load_sample_data();
+        } else {
+            loaded_bank->unload_sample_data();
+        }
+    }
+}
+
+bool FmodBankLoader::is_preload_sample_data() const {
+    return preload_sample_data;
 }
 
 const Array& FmodBankLoader::get_bank_paths() const {
@@ -46,8 +95,13 @@ bool FmodBankLoader::_property_get_revert(const StringName& p_property, Variant&
 }
 
 void godot::FmodBankLoader::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("set_bank_paths", "p_paths"), &FmodBankLoader::set_bank_paths);
+    ClassDB::bind_method(D_METHOD("set_bank_paths", "paths"), &FmodBankLoader::set_bank_paths);
     ClassDB::bind_method(D_METHOD("get_bank_paths"), &FmodBankLoader::get_bank_paths);
+    ClassDB::bind_method(
+        D_METHOD("set_preload_sample_data", "preload_sample_data"),
+        &FmodBankLoader::set_preload_sample_data
+    );
+    ClassDB::bind_method(D_METHOD("is_preload_sample_data"), &FmodBankLoader::is_preload_sample_data);
 
     ADD_PROPERTY(
       PropertyInfo(
@@ -59,5 +113,10 @@ void godot::FmodBankLoader::_bind_methods() {
       ),
       "set_bank_paths",
       "get_bank_paths"
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::BOOL, "preload_sample_data"),
+        "set_preload_sample_data",
+        "is_preload_sample_data"
     );
 }

@@ -43,6 +43,11 @@ sources = [
     Glob('src/plugins/*.cpp')
     ]
 
+# Add documentation data for editor and debug builds
+if env["target"] in ["editor", "template_debug"]:
+    doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml"))
+    sources.append(doc_data)
+
 lfix = ""
 debug = False
 if env["target"] == "template_debug" or env["target"] == "editor":
@@ -108,8 +113,8 @@ elif env["platform"] == "ios":
     ])
 
 elif env["platform"] == "android":
-    libfmod = 'libfmod%s.so' % lfix
-    libfmodstudio = 'libfmodstudio%s.so' % lfix
+    libfmod = 'libfmod%s' % lfix
+    libfmodstudio = 'libfmodstudio%s' % lfix
     fmod_info_table = {
         "armv7": "armeabi-v7a",
         "arm64": "arm64-v8a",

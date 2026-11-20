@@ -1,8 +1,9 @@
 #ifndef GODOTFMOD_FMOD_SERVER_H
 #define GODOTFMOD_FMOD_SERVER_H
 
+#include "core/binder_common.hpp"
 #include "core/fmod_file.h"
-#include "core/fmod_sound.h"
+#include "core/object_id.hpp"
 #include "data/performance_data.h"
 #include "fmod_cache.h"
 #include "resources/fmod_plugins_settings.h"
@@ -13,20 +14,15 @@
 #include "studio/fmod_vca.h"
 #include "templates/hash_map.hpp"
 #include "templates/local_vector.hpp"
+#include "templates/mutex.hpp"
 #include "templates/vector.hpp"
 #include "variant/string.hpp"
 
 #include <callback/event_callbacks.h>
-#include <callback/file_callbacks.h>
-#include <helpers/constants.h>
-#include <resources/fmod_dsp_settings.h>
 #include <resources/fmod_settings.h>
-#include <resources/fmod_software_format_settings.h>
-#include <resources/fmod_sound_3d_settings.h>
 
 #include <classes/canvas_item.hpp>
 #include <classes/global_constants.hpp>
-#include <classes/mutex.hpp>
 #include <classes/object.hpp>
 #include <core/object.hpp>
 #include <fmod.hpp>
@@ -59,6 +55,41 @@ namespace godot {
         static FmodServer* singleton;
 
     public:
+        // Not registered with Godot: no method or property takes it yet.
+        enum InitFlags : uint32_t {
+            INIT_3D_RIGHTHANDED = FMOD_INIT_3D_RIGHTHANDED,
+            CHANNEL_DISTANCEFILTER = FMOD_INIT_CHANNEL_DISTANCEFILTER,
+            CHANNEL_LOWPASS = FMOD_INIT_CHANNEL_LOWPASS,
+            GEOMETRY_USECLOSEST = FMOD_INIT_GEOMETRY_USECLOSEST,
+            INIT_NORMAL = FMOD_INIT_NORMAL,
+            PREFER_DOLBY_DOWNMIX = FMOD_INIT_PREFER_DOLBY_DOWNMIX,
+            PROFILE_ENABLE = FMOD_INIT_PROFILE_ENABLE,
+            PROFILE_METER_ALL = FMOD_INIT_PROFILE_METER_ALL,
+            STREAM_FROM_UPDATE = FMOD_INIT_STREAM_FROM_UPDATE,
+            THREAD_UNSAFE = FMOD_INIT_THREAD_UNSAFE,
+            VOL0_BECOMES_VIRTUAL = FMOD_INIT_VOL0_BECOMES_VIRTUAL,
+        };
+
+        // Not registered with Godot: no method or property takes it yet.
+        enum StudioInitFlags : uint32_t {
+            STUDIO_INIT_NORMAL = FMOD_STUDIO_INIT_NORMAL,
+            LIVEUPDATE = FMOD_STUDIO_INIT_LIVEUPDATE,
+            ALLOW_MISSING_PLUGINS = FMOD_STUDIO_INIT_ALLOW_MISSING_PLUGINS,
+            SYNCHRONOUS_UPDATE = FMOD_STUDIO_INIT_SYNCHRONOUS_UPDATE,
+            DEFERRED_CALLBACKS = FMOD_STUDIO_INIT_DEFERRED_CALLBACKS,
+            LOAD_FROM_UPDATE = FMOD_STUDIO_INIT_LOAD_FROM_UPDATE,
+        };
+
+        // Not registered with Godot: no method or property takes it yet.
+        enum StudioSystemCallbackType : uint32_t {
+            PREUPDATE = FMOD_STUDIO_SYSTEM_CALLBACK_PREUPDATE,
+            POSTUPDATE = FMOD_STUDIO_SYSTEM_CALLBACK_POSTUPDATE,
+            BANK_UNLOAD = FMOD_STUDIO_SYSTEM_CALLBACK_BANK_UNLOAD,
+            LIVEUPDATE_CONNECTED = FMOD_STUDIO_SYSTEM_CALLBACK_LIVEUPDATE_CONNECTED,
+            LIVEUPDATE_DISCONNECTED = FMOD_STUDIO_SYSTEM_CALLBACK_LIVEUPDATE_DISCONNECTED,
+            ALL = FMOD_STUDIO_SYSTEM_CALLBACK_ALL,
+        };
+
         union EventIdentifier {
             const char* string_identifier;
             FMOD_GUID guid;
@@ -87,10 +118,12 @@ namespace godot {
         FMOD::Studio::System* system;
         FMOD::System* coreSystem;
 
-        bool isInitialized;
+        inline static bool isInitialized = false;
         bool isNotInitializedPrinted;
 
-        float distanceScale;
+        String godotAudioBus;
+        ObjectID runtime;
+        void add_runtime_to_scene_tree();
 
         FmodCache* cache;
 
@@ -107,14 +140,14 @@ namespace godot {
         // call_deferred is not implemented in godot-cpp.
         // Would have prefered a SpinLock but does not seems to exist in godot-cpp.
         // TODO: Change when https://github.com/godotengine/godot-cpp/pull/1091 is merged.
-        Ref<Mutex> callback_mutex;
+        Mutex callback_mutex;
         List<Callback> callbacks_to_process;
-
 
         void _set_listener_attributes();
 
         Ref<FmodEventDescription> _get_event_description(const String& event_name);
         Ref<FmodEventDescription> _get_event_description(const FMOD_GUID& guid);
+        static bool _is_usable(const Ref<FmodEventDescription>& desc);
 
         void _update_performance_data();
 
@@ -124,20 +157,20 @@ namespace godot {
         ~FmodServer() override;
 
         static FmodServer* get_singleton();
+        static bool is_initialized() { return isInitialized; }
 
         Vector<Callable> event_creation_callbacks = {};
         Vector<Callable> event_removal_callbacks = {};
 
         // LIFECYCLE
-        void init(const Ref<FmodGeneralSettings>& p_settings);
+        void init(const Ref<FmodSettings>& p_settings = Ref<FmodSettings>());
         void update();
         void shutdown();
+        String get_godot_audio_bus() const;
 
         // SETTINGS
-        void set_software_format(const Ref<FmodSoftwareFormatSettings>& p_settings);
-        void set_sound_3d_settings(const Ref<FmodSound3DSettings>& p_settings);
-        void set_system_dsp_buffer_size(const Ref<FmodDspSettings>& p_settings);
-        Ref<FmodDspSettings> get_system_dsp_buffer_settings();
+        void set_spatialization(float p_doppler_scale, float p_rolloff_scale);
+        void set_distance_factors(float p_factor_2d, float p_factor_3d);
         unsigned int get_system_dsp_buffer_length();
         int get_system_dsp_num_buffers();
 
@@ -178,6 +211,8 @@ namespace godot {
         void set_global_parameter_by_id(uint64_t parameter_id, float value);
         void set_global_parameter_by_id_with_label(uint64_t parameter_id, const String& label);
         float get_global_parameter_by_id(uint64_t parameter_id);
+        float get_global_parameter_user_value_by_name(const String& parameter_name);
+        float get_global_parameter_user_value_by_id(uint64_t parameter_id);
         Dictionary get_global_parameter_desc_by_name(const String& parameter_name);
         Dictionary get_global_parameter_desc_by_id(uint64_t parameter_id);
         int get_global_parameter_desc_count();
@@ -190,18 +225,18 @@ namespace godot {
         int get_system_listener_number() const;
         float get_system_listener_weight(int index);
         void set_system_listener_weight(int index, float weight);
-        Transform3D get_listener_transform3d(int index);
-        Transform2D get_listener_transform2d(int index);
-        Vector3 get_listener_3d_velocity(int index);
-        Vector2 get_listener_2d_velocity(int index);
-        void set_listener_transform3d(int index, const Transform3D& transform);
-        void set_listener_transform2d(int index, const Transform2D& transform);
+        Transform3D get_listener_transform_3d(int index);
+        Transform2D get_listener_transform_2d(int index);
+        Vector3 get_listener_velocity_3d(int index);
+        Vector2 get_listener_velocity_2d(int index);
+        void set_listener_transform_3d(int index, const Transform3D& transform);
+        void set_listener_transform_2d(int index, const Transform2D& transform);
         void set_listener_lock(int index, bool isLocked);
         bool get_listener_lock(int index);
         Object* get_object_attached_to_listener(int index);
 
         // BANKS
-        Ref<FmodBank> load_bank(const String& pathToBank, unsigned int flag);
+        Ref<FmodBank> load_bank(const String& pathToBank, BitField<FmodBank::StudioLoadBankFlags> flags);
         void unload_bank(const String& pathToBank);
         bool banks_still_loading();
 
@@ -222,10 +257,11 @@ namespace godot {
         Ref<FmodEvent> create_event_instance_from_description(const Ref<FmodEventDescription>& event_description);
 
         // SOUNDS
+    private:
+        Ref<FmodFile> _load_file(const String& path, FMOD_MODE mode);
+    public:
         Ref<FmodFile> load_file_as_sound(const String& path);
         Ref<FmodFile> load_file_as_music(const String& path);
-        void unload_file(const String& path);
-        Ref<FmodSound> create_sound_instance(const String& path);
         FMOD_STUDIO_SOUND_INFO get_sound_info(const String& sound_key) const;
         FMOD::Sound* create_sound(FMOD_STUDIO_SOUND_INFO& sound_info, FMOD_MODE mode) const;
 
@@ -266,12 +302,13 @@ namespace godot {
         void unpause_all_events();
         void mute_all_events();
         void unmute_all_events();
+        void mixer_suspend();
+        void mixer_resume();
         void wait_for_all_loads();
 
     protected:
         static void _bind_methods();
     };
-
 
     template<FmodServer::EventIdentifierType parameter_type>
     Ref<FmodEventDescription> FmodServer::fetch_event_description(const FmodServer::EventIdentifier& identifier){
@@ -292,8 +329,11 @@ namespace godot {
 
     template<FmodServer::EventIdentifierType parameter_type>
     Ref<FmodEvent> FmodServer::_create_event_instance(const EventIdentifier& identifier) {
+        Ref<FmodEventDescription> desc = fetch_event_description<parameter_type>(identifier);
+        if (!_is_usable(desc)) { return {}; }
+
         FMOD::Studio::EventInstance* eventInstance = nullptr;
-        ERROR_CHECK(fetch_event_description<parameter_type>(identifier)->get_wrapped()->createInstance(&eventInstance));
+        ERROR_CHECK(desc->get_wrapped()->createInstance(&eventInstance));
 
         Ref<FmodEvent> ref = FmodEvent::create_ref(eventInstance);
         if (ref.is_null() || !ref->is_valid()) {
@@ -302,7 +342,6 @@ namespace godot {
         }
 
         ref->get_wrapped()->setUserData(ref.ptr());
-        ref->set_distance_scale(distanceScale);
         runningEvents.push_back(ref);
         return ref;
     }
@@ -310,11 +349,11 @@ namespace godot {
     template<FmodServer::EventIdentifierType parameter_type>
     void FmodServer::_play_one_shot(const FmodServer::EventIdentifier& identifier, Node* game_obj, const Dictionary& parameters) {
         Ref<FmodEventDescription> desc =  fetch_event_description<parameter_type>(identifier);
+        if (!_is_usable(desc)) { return; }
         if (!desc->is_one_shot()){
             GODOT_LOG_WARNING(desc->get_path() + " is not a OneShot event.")
             return;
         }
-
 
         Ref<FmodEvent> ref = _create_event_instance<parameter_type>(identifier);
 

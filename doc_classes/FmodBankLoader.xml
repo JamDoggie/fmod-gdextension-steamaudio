@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FmodBankLoader" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A node for automatically loading FMOD Studio banks when entering the scene tree.
+	</brief_description>
+	<description>
+		FmodBankLoader is a utility node that automatically loads FMOD Studio bank files when it enters the scene tree. This provides a convenient way to ensure that required audio content is loaded before it's needed.
+
+		Banks contain the audio content and metadata for FMOD Studio events, including:
+		- Event definitions and parameters
+		- Audio samples (if not streamed)
+		- Bus and VCA configurations
+		- Mixing and effect settings
+
+		The node accepts an array of bank file paths and loads them, in order, when it enters the scene tree, and releases them when it leaves it. Changing [member bank_paths] while the node is in the tree loads the banks added and releases the banks removed. A bank stays loaded while anything else still holds it.
+
+		This is particularly useful for loading banks at the start of a level or scene, ensuring all required audio content is available when events are played.
+
+		Note: Banks must be available in the project's resources or file system at the specified paths.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="bank_paths" type="Array" setter="set_bank_paths" getter="get_bank_paths" default="[]">
+			An array of file paths to FMOD Studio bank files (.bank) that should be loaded when this node enters the scene tree. Paths should be relative to the project or absolute file paths.
+		</member>
+		<member name="preload_sample_data" type="bool" setter="set_preload_sample_data" getter="is_preload_sample_data" default="false">
+			If [code]true[/code], the loader also loads the sample data of its banks' events (see [method FmodBank.load_sample_data]), so they play without loading delay, and unloads it when the banks are released: when the node leaves the tree, when a bank is removed from [member bank_paths], or when this property is turned off.
+		</member>
+	</members>
+</class>

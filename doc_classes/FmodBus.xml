@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="FmodBus" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Represents an FMOD Studio bus for audio mixing and effects processing.
+	</brief_description>
+	<description>
+		FmodBus represents an FMOD Studio bus, which is a mixing channel in the audio pipeline. Buses are used to group audio signals together for collective processing, volume control, and effects application.
+
+		Buses form a hierarchy where audio from events flows through buses and their parent buses until reaching the master bus. This allows for:
+		- Grouped volume control (e.g., "Music", "SFX", "Voice" buses)
+		- Collective effects processing (e.g., reverb on all music)
+		- Ducking and sidechaining between bus groups
+		- Centralized mixing control
+
+		Buses are defined in FMOD Studio and loaded as part of bank files. Use [method FmodServer.get_bus] to obtain bus references from loaded banks.
+
+		Operations on buses affect all events and child buses routing through them, making buses powerful tools for dynamic mixing control.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_guid" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the GUID of this bus, as a string in braces: [code]{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}[/code].
+			</description>
+		</method>
+		<method name="get_path" qualifiers="const">
+			<return type="String" />
+			<description>
+				Returns the path of this bus in the FMOD Studio project, such as [code]bus:/SFX[/code]. It is empty when the strings bank is not loaded.
+			</description>
+		</method>
+		<method name="is_valid" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the underlying FMOD bus exists. It becomes invalid once released or once its bank is unloaded.
+			</description>
+		</method>
+		<method name="stop_all_events">
+			<return type="void" />
+			<param index="0" name="stop_mode" type="int" enum="FmodEvent.StudioStopMode" />
+			<description>
+				Stops all events currently routing through this bus. The stopMode parameter controls how the events are stopped:
+				- FMOD_STUDIO_STOP_ALLOWFADEOUT: Allow events to fade out naturally
+				- FMOD_STUDIO_STOP_IMMEDIATE: Stop events immediately
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="mute" type="bool" setter="set_mute" getter="get_mute">
+			If [code]true[/code], the bus is currently muted.
+		</member>
+		<member name="paused" type="bool" setter="set_paused" getter="get_paused">
+			If [code]true[/code], the bus is currently paused.
+		</member>
+		<member name="volume" type="float" setter="set_volume" getter="get_volume">
+			The volume level of the bus. This is a multiplier where 1.0 is the original volume set in FMOD Studio.
+		</member>
+	</members>
+</class>

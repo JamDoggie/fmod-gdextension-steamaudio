@@ -9,12 +9,14 @@ using namespace godot;
 void FmodEvent::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_parameter_by_name", "parameter_name"), &FmodEvent::get_parameter_by_name);
     ClassDB::bind_method(D_METHOD("set_parameter_by_name", "parameter_name", "value"), &FmodEvent::set_parameter_by_name);
-    ClassDB::bind_method(D_METHOD("set_parameter_by_name_with_label", "parameter_name", "label", "ignoreseekspeed"), &FmodEvent::set_parameter_by_name_with_label);
+    ClassDB::bind_method(D_METHOD("set_parameter_by_name_with_label", "parameter_name", "label", "ignore_seek_speed"), &FmodEvent::set_parameter_by_name_with_label, DEFVAL(false));
     ClassDB::bind_method(D_METHOD("get_parameter_by_id", "parameter_id"), &FmodEvent::get_parameter_by_id);
     ClassDB::bind_method(D_METHOD("set_parameter_by_id", "parameter_id", "value"), &FmodEvent::set_parameter_by_id);
-    ClassDB::bind_method(D_METHOD("set_parameter_by_id_with_label", "parameter_id", "label", "ignoreseekspeed"), &FmodEvent::set_parameter_by_id_with_label);
+    ClassDB::bind_method(D_METHOD("set_parameter_by_id_with_label", "parameter_id", "label", "ignore_seek_speed"), &FmodEvent::set_parameter_by_id_with_label, DEFVAL(false));
+    ClassDB::bind_method(D_METHOD("get_parameter_user_value_by_name", "parameter_name"), &FmodEvent::get_parameter_user_value_by_name);
+    ClassDB::bind_method(D_METHOD("get_parameter_user_value_by_id", "parameter_id"), &FmodEvent::get_parameter_user_value_by_id);
     ClassDB::bind_method(D_METHOD("start"), &FmodEvent::start);
-    ClassDB::bind_method(D_METHOD("stop", "stopMode"), &FmodEvent::stop);
+    ClassDB::bind_method(D_METHOD("stop", "stop_mode"), &FmodEvent::stop);
     ClassDB::bind_method(D_METHOD("event_key_off"), &FmodEvent::event_key_off);
     ClassDB::bind_method(D_METHOD("get_playback_state"), &FmodEvent::get_playback_state);
     ClassDB::bind_method(D_METHOD("get_paused"), &FmodEvent::get_paused);
@@ -30,37 +32,69 @@ void FmodEvent::_bind_methods() {
     ClassDB::bind_method(D_METHOD("is_virtual"), &FmodEvent::is_virtual);
     ClassDB::bind_method(D_METHOD("set_listener_mask", "mask"), &FmodEvent::set_listener_mask);
     ClassDB::bind_method(D_METHOD("get_listener_mask"), &FmodEvent::get_listener_mask);
-    ClassDB::bind_method(D_METHOD("set_2d_attributes", "position"), &FmodEvent::set_2d_attributes);
-    ClassDB::bind_method(D_METHOD("get_2d_attributes"), &FmodEvent::get_2d_attributes);
-    ClassDB::bind_method(D_METHOD("set_3d_attributes", "transform"), &FmodEvent::set_3d_attributes);
-    ClassDB::bind_method(D_METHOD("get_3d_attributes"), &FmodEvent::get_3d_attributes);
-    ClassDB::bind_method(D_METHOD("set_node_attributes", "transform"), &FmodEvent::set_node_attributes);
-    ClassDB::bind_method(D_METHOD("set_callback", "callback", "callbackMask"), &FmodEvent::set_callback);
-    ClassDB::bind_method(D_METHOD("set_programmer_callback", "p_programmers_callback_sound_key"), &FmodEvent::set_programmer_callback);
+    ClassDB::bind_method(D_METHOD("set_transform_2d", "transform"), &FmodEvent::set_transform_2d);
+    ClassDB::bind_method(D_METHOD("get_transform_2d"), &FmodEvent::get_transform_2d);
+    ClassDB::bind_method(D_METHOD("set_transform_3d", "transform"), &FmodEvent::set_transform_3d);
+    ClassDB::bind_method(D_METHOD("get_transform_3d"), &FmodEvent::get_transform_3d);
+    ClassDB::bind_method(D_METHOD("set_node_attributes", "node"), &FmodEvent::set_node_attributes);
+    ClassDB::bind_method(D_METHOD("set_callback", "callback", "callback_mask"), &FmodEvent::set_callback);
+    ClassDB::bind_method(D_METHOD("set_programmer_callback", "sound_key"), &FmodEvent::set_programmer_callback);
     ClassDB::bind_method(D_METHOD("get_programmer_callback_sound_key"), &FmodEvent::get_programmers_callback_sound_key);
     ClassDB::bind_method(D_METHOD("is_valid"), &FmodEvent::is_valid);
     ClassDB::bind_method(D_METHOD("release"), &FmodEvent::release);
     ClassDB::bind_method(D_METHOD("get_event_pointer"), &FmodEvent::get_event_pointer);
+    ClassDB::bind_method(D_METHOD("get_channel_group"), &FmodEvent::get_channel_group);
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "paused",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_paused", "get_paused");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pitch",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_pitch", "get_pitch");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_volume", "get_volume");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "position",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_timeline_position", "get_timeline_position");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "listener_mask",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_listener_mask", "get_listener_mask");
-    ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM2D, "transform_2d",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_2d_attributes", "get_2d_attributes");
-    ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM3D, "transform_3d",PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_node_attributes", "get_3d_attributes");
+    ADD_PROPERTY(
+        PropertyInfo(Variant::TRANSFORM2D, "transform_2d", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE),
+        "set_transform_2d",
+        "get_transform_2d"
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::TRANSFORM3D, "transform_3d", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE),
+        "set_transform_3d",
+        "get_transform_3d"
+    );
 
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_PLAYING);
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_SUSTAINING);
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_STOPPED);
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_STARTING);
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_STOPPING);
-    BIND_ENUM_CONSTANT(FMOD_STUDIO_PLAYBACK_FORCEINT);
+    BIND_ENUM_CONSTANT(ALLOWFADEOUT);
+    BIND_ENUM_CONSTANT(IMMEDIATE);
+
+    BIND_ENUM_CONSTANT(PLAYING);
+    BIND_ENUM_CONSTANT(SUSTAINING);
+    BIND_ENUM_CONSTANT(PLAYBACK_STOPPED);
+    BIND_ENUM_CONSTANT(PLAYBACK_STARTING);
+    BIND_ENUM_CONSTANT(STOPPING);
+
+    BIND_BITFIELD_FLAG(CREATED);
+    BIND_BITFIELD_FLAG(DESTROYED);
+    BIND_BITFIELD_FLAG(CALLBACK_STARTING);
+    BIND_BITFIELD_FLAG(STARTED);
+    BIND_BITFIELD_FLAG(RESTARTED);
+    BIND_BITFIELD_FLAG(CALLBACK_STOPPED);
+    BIND_BITFIELD_FLAG(START_FAILED);
+    BIND_BITFIELD_FLAG(CREATE_PROGRAMMER_SOUND);
+    BIND_BITFIELD_FLAG(DESTROY_PROGRAMMER_SOUND);
+    BIND_BITFIELD_FLAG(PLUGIN_CREATED);
+    BIND_BITFIELD_FLAG(PLUGIN_DESTROYED);
+    BIND_BITFIELD_FLAG(TIMELINE_MARKER);
+    BIND_BITFIELD_FLAG(TIMELINE_BEAT);
+    BIND_BITFIELD_FLAG(SOUND_PLAYED);
+    BIND_BITFIELD_FLAG(SOUND_STOPPED);
+    BIND_BITFIELD_FLAG(REAL_TO_VIRTUAL);
+    BIND_BITFIELD_FLAG(VIRTUAL_TO_REAL);
+    BIND_BITFIELD_FLAG(START_EVENT_COMMAND);
+    BIND_BITFIELD_FLAG(NESTED_TIMELINE_BEAT);
+    BIND_BITFIELD_FLAG(ALL);
 }
 
 float FmodEvent::get_parameter_by_name(const String& parameter_name) const {
     float p = -1;
-    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByName(parameter_name.utf8().get_data(), &p),
+    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByName(parameter_name.utf8().get_data(), nullptr, &p),
                             vformat("Cannot get parameter %s", parameter_name));
     return p;
 }
@@ -81,9 +115,23 @@ float FmodEvent::get_parameter_by_id(uint64_t long_id) const {
 
 float FmodEvent::get_parameter_by_fmod_id(const FMOD_STUDIO_PARAMETER_ID& parameter_id) const {
     float value = -1.0f;
-    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByID(parameter_id, &value),
+    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByID(parameter_id, nullptr, &value),
                             vformat("Cannot get parameter with id: %d", fmod_parameter_id_to_ulong(parameter_id)));
     return value;
+}
+
+float FmodEvent::get_parameter_user_value_by_name(const String& parameter_name) const {
+    float user_value = -1;
+    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByName(parameter_name.utf8().get_data(), &user_value),
+                            vformat("Cannot get user value of parameter %s", parameter_name));
+    return user_value;
+}
+
+float FmodEvent::get_parameter_user_value_by_id(uint64_t long_id) const {
+    float user_value = -1;
+    ERROR_CHECK_WITH_REASON(_wrapped->getParameterByID(ulong_to_fmod_parameter_id(long_id), &user_value),
+                            vformat("Cannot get user value of parameter with id: %d", long_id));
+    return user_value;
 }
 
 void FmodEvent::set_parameter_by_id(uint64_t long_id, float value) const {
@@ -112,18 +160,18 @@ void FmodEvent::start() const {
     ERROR_CHECK(_wrapped->start());
 }
 
-void FmodEvent::stop(int stopMode) const {
-    ERROR_CHECK(_wrapped->stop(static_cast<FMOD_STUDIO_STOP_MODE>(stopMode)));
+void FmodEvent::stop(StudioStopMode stop_mode) const {
+    ERROR_CHECK(_wrapped->stop(fmod_enum_cast<FMOD_STUDIO_STOP_MODE>(stop_mode)));
 }
 
 void FmodEvent::event_key_off() const {
     ERROR_CHECK(_wrapped->keyOff());
 }
 
-FMOD_STUDIO_PLAYBACK_STATE FmodEvent::get_playback_state() const {
-    FMOD_STUDIO_PLAYBACK_STATE playback_state;
+FmodEvent::StudioPlaybackState FmodEvent::get_playback_state() const {
+    FMOD_STUDIO_PLAYBACK_STATE playback_state = FMOD_STUDIO_PLAYBACK_STOPPED;
     ERROR_CHECK(_wrapped->getPlaybackState(&playback_state));
-    return playback_state;
+    return fmod_enum_cast<StudioPlaybackState>(playback_state);
 }
 
 bool FmodEvent::get_paused() const {
@@ -192,41 +240,55 @@ uint32_t FmodEvent::get_listener_mask() const {
     return mask;
 }
 
-void FmodEvent::set_2d_attributes(const Transform2D& position) const {
-    FMOD_3D_ATTRIBUTES attr = get_3d_attributes_from_transform2d(position, distanceScale);
+void FmodEvent::set_transform_2d(const Transform2D& transform) const {
+    FMOD_3D_ATTRIBUTES attr = FmodSpatial::attributes_to_fmod_2d(transform);
     ERROR_CHECK(_wrapped->set3DAttributes(&attr));
 }
 
-Transform2D FmodEvent::get_2d_attributes() const {
-    Transform2D _2Dattr;
+Transform2D FmodEvent::get_transform_2d() const {
+    Transform2D transform;
     FMOD_3D_ATTRIBUTES attr;
     ERROR_CHECK(_wrapped->get3DAttributes(&attr));
-    _2Dattr = get_transform2d_from_3d_attributes(attr, distanceScale);
-    return _2Dattr;
+    transform = FmodSpatial::transform_to_godot_2d(attr);
+    return transform;
 }
 
-void FmodEvent::set_3d_attributes(const Transform3D& transform) const {
-    FMOD_3D_ATTRIBUTES attr = get_3d_attributes_from_transform3d(transform, distanceScale);
+
+PackedByteArray FmodEvent::get_event_pointer() {
+    PackedByteArray array;
+
+    std::intptr_t pointer = reinterpret_cast<std::intptr_t>(_wrapped);
+    array.resize(sizeof(std::intptr_t));
+
+    for (int i = 0; i < sizeof(std::intptr_t); i++) {
+        array[i] = static_cast<uint8_t>((pointer >> (i * 8)) & 0xFF);
+    }
+
+    return array;
+}
+
+void FmodEvent::set_transform_3d(const Transform3D& transform) const {
+    FMOD_3D_ATTRIBUTES attr = FmodSpatial::attributes_to_fmod_3d(transform);
     ERROR_CHECK(_wrapped->set3DAttributes(&attr));
 }
 
-Transform3D FmodEvent::get_3d_attributes() const {
-    Transform3D _3Dattr;
+Transform3D FmodEvent::get_transform_3d() const {
+    Transform3D transform;
     FMOD_3D_ATTRIBUTES attr;
     ERROR_CHECK(_wrapped->get3DAttributes(&attr));
-    _3Dattr = get_transform3d_from_3d_attributes(attr, distanceScale);
-    return _3Dattr;
+    transform = FmodSpatial::transform_to_godot_3d(attr);
+    return transform;
 }
 
 void FmodEvent::set_node_attributes(Node* node) const {
     if (node->is_inside_tree()) {
         if (auto* ci {Node::cast_to<CanvasItem>(node)}) {
-            FMOD_3D_ATTRIBUTES attr = get_3d_attributes_from_transform2d(ci->get_global_transform(), distanceScale);
+            FMOD_3D_ATTRIBUTES attr = FmodSpatial::attributes_to_fmod_2d(ci->get_global_transform());
             ERROR_CHECK(_wrapped->set3DAttributes(&attr));
             return;
         }
         if (auto* s {Node::cast_to<Node3D>(node)}) {
-            FMOD_3D_ATTRIBUTES attr = get_3d_attributes_from_transform3d(s->get_global_transform(), distanceScale);
+            FMOD_3D_ATTRIBUTES attr = FmodSpatial::attributes_to_fmod_3d(s->get_global_transform());
             ERROR_CHECK(_wrapped->set3DAttributes(&attr));
             return;
         }
@@ -234,10 +296,10 @@ void FmodEvent::set_node_attributes(Node* node) const {
     GODOT_LOG_ERROR("Invalid Object. A Godot object bound to FMOD has to be either a Node3D or CanvasItem.")
 }
 
-void FmodEvent::set_callback(const Callable& callback, uint32_t p_callback_mask) {
+void FmodEvent::set_callback(const Callable& callback, BitField<StudioEventCallbackType> p_callback_mask) {
     eventCallback = callback;
-    callback_mask = p_callback_mask;
-    ERROR_CHECK(_wrapped->setCallback(Callbacks::event_callback, p_callback_mask));
+    callback_mask = fmod_enum_cast<FMOD_STUDIO_EVENT_CALLBACK_TYPE>(p_callback_mask);
+    ERROR_CHECK(_wrapped->setCallback(Callbacks::event_callback, callback_mask));
 }
 
 void FmodEvent::set_programmer_callback(const String& p_programmers_callback_sound_key) {
@@ -253,21 +315,16 @@ const String& FmodEvent::get_programmers_callback_sound_key() const {
     return programmers_callback_sound_key;
 }
 
-void FmodEvent::set_distance_scale(float scale){
-    distanceScale = scale;
-}
+Ref<FmodChannelGroup> FmodEvent::get_channel_group() const {
+    FMOD::ChannelGroup* channel_group = nullptr;
+    ERROR_CHECK_WITH_REASON(_wrapped->getChannelGroup(&channel_group), vformat("Cannot get ChannelGroup"));
 
-PackedByteArray FmodEvent::get_event_pointer() {
-    PackedByteArray array;
-
-    std::intptr_t pointer = reinterpret_cast<std::intptr_t>(_wrapped);
-    array.resize(sizeof(std::intptr_t));
-    
-    for (int i = 0; i < sizeof(std::intptr_t); i++) {
-        array[i] = static_cast<uint8_t>((pointer >> (i * 8)) & 0xFF);
+    if (channel_group) {
+        Ref<FmodChannelGroup> ref = FmodChannelGroup::create_ref(channel_group);
+        return ref;
     }
 
-    return array;
+    return {};
 }
 
 FmodEvent::~FmodEvent() {

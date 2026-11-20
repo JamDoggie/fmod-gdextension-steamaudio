@@ -73,14 +73,16 @@ func _ready():
 
 
 func regenerate_tree(callable: Callable = Callable()):
-	tree.clear()
-	generate_tree(callable)
-
-func generate_tree(callable: Callable = Callable()):
-	%SelectButton.visible = should_display_select_button
 	if _current_select_callable != Callable() && _current_select_callable.get_object() != null:
 		emit_path_and_guid.disconnect(_current_select_callable)
 	_current_select_callable = callable
+	if _current_select_callable != Callable():
+		emit_path_and_guid.connect(_current_select_callable)
+	tree.clear()
+	generate_tree()
+
+func generate_tree():
+	%SelectButton.visible = should_display_select_button
 
 	var root_item := tree.create_item()
 	root_item.set_text(0, "Fmod objects")
@@ -96,10 +98,7 @@ func generate_tree(callable: Callable = Callable()):
 		var events := fmod_bank.get_description_list()
 
 		if search.is_empty():
-			var bank_item := tree.create_item(root_item)
-			bank_item.set_text(0, fmod_bank.get_godot_res_path())
-			bank_item.set_icon(0, _bank_icon)
-			bank_item.set_metadata(0, bank)
+			var bank_item := _add_bank_item(fmod_bank, root_item)
 
 			if flags & ToDisplayFlags.BUSES and buses.size() != 0:
 				buses.sort_custom(sort_by_path)
@@ -132,6 +131,8 @@ func generate_tree(callable: Callable = Callable()):
 					_add_elements_as_tree(events, bank_item)
 
 		else:
+			if flags == 0 and fmod_bank.get_godot_res_path().containsn(search):
+				_add_bank_item(fmod_bank, root_item)
 			if flags & ToDisplayFlags.BUSES:
 				_add_elements_as_items(buses, root_item)
 			if flags & ToDisplayFlags.VCA:
@@ -145,11 +146,14 @@ func generate_tree(callable: Callable = Callable()):
 	if copy_guid_button.visible:
 		copy_guid_button.visible = should_display_copy_buttons
 
-	if _current_select_callable != Callable():
-		print(_current_select_callable)
-		emit_path_and_guid.connect(_current_select_callable)
-
 	%SelectButton.visible = should_display_select_button and %GuidLabel.text != ""
+
+func _add_bank_item(bank: FmodBank, parent: TreeItem) -> TreeItem:
+	var bank_item := tree.create_item(parent)
+	bank_item.set_text(0, bank.get_godot_res_path())
+	bank_item.set_icon(0, _bank_icon)
+	bank_item.set_metadata(0, bank)
+	return bank_item
 
 func _add_elements_as_items(elements: Array, parent: TreeItem):
 		for element in elements:
@@ -205,6 +209,7 @@ func _on_item_selected():
 	var metadata = tree.get_selected().get_metadata(0)
 	if metadata == null or !metadata.get_guid():
 		%PathsBG.hide()
+		%EventPlayControls.stop_and_release_instance()
 		%EventPlayControls.hide()
 		copy_path_button.visible = false
 		copy_guid_button.visible = false
@@ -218,8 +223,8 @@ func _on_item_selected():
 	if should_display_copy_buttons:
 		copy_path_button.visible = true
 		copy_guid_button.visible = true
-	if should_display_select_button:
-		%SelectButton.visible = true
+	# Banks are picked with no flags, buses, VCAs and events with theirs.
+	%SelectButton.visible = should_display_select_button and (metadata is FmodBank) == (flags == 0)
 
 	if metadata is FmodEventDescription:
 		%EventPlayControls.set_fmod_event(metadata)
@@ -227,6 +232,7 @@ func _on_item_selected():
 		%ParametersLabel.visible = _show_parameter_controls
 		%ParametersContainer.visible = _show_parameter_controls
 		return
+	%EventPlayControls.stop_and_release_instance()
 	%EventPlayControls.hide()
 	%EventParametersDisplay.hide()
 	%ParametersLabel.visible = false
@@ -240,7 +246,10 @@ func _on_copy_guid_button():
 
 
 func on_refresh_banks_button_pressed() -> void:
-	# unload banks
+	# The auditioned event's bank is about to be unloaded: FMOD destroys the released instance on its next update.
+	%EventPlayControls.stop_and_release_instance()
+	%EventPlayControls.hide()
+	await get_tree().process_frame
 	banks.clear()
 	tree.clear()
 	FmodBankDatabase.reload_all_banks()
@@ -268,4 +277,5 @@ static func sort_by_path(a, b):
 
 func _on_text_edit_text_submitted(new_text: String) -> void:
 	search = new_text
-	regenerate_tree()
+	tree.clear()
+	generate_tree()

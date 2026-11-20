@@ -1,0 +1,26 @@
+name: Build GDExtension
+description: Restores the cached FMOD SDK, installs SCons, then compiles the extension into demo/addons/fmod/libs/<platform>/.
+inputs:
+  platform:
+    required: true
+  target:
+    required: true
+  scons-flags:
+    default: ''
+  fmod-version:
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - shell: bash
+      run: python -m pip install scons
+    - uses: ./.github/actions/fmod-sdk-cache
+      with:
+        mode: restore
+        fmod-version: ${{ inputs.fmod-version }}
+    - name: Compile GDExtension
+      shell: bash
+      run: scons platform=${{ inputs.platform }} target=${{ inputs.target }} -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo "$NUMBER_OF_PROCESSORS")" ${{ inputs.scons-flags }}

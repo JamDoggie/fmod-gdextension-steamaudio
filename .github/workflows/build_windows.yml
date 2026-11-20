@@ -1,0 +1,56 @@
+name: 🪟 Windows Builds
+on:
+  workflow_call:
+    inputs:
+      fmod-version:
+        type: string
+        required: true
+
+jobs:
+  build-windows:
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.target }} ${{ matrix.arch }}
+    permissions:
+      contents: read
+      actions: write
+    env:
+      SCONS_CACHE: ${{ github.workspace }}/.scons-cache
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [editor, template_debug, template_release]
+        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/scons-cache
+        with:
+          mode: restore
+          name: windows-${{ matrix.target }}-${{ matrix.arch }}
+      - uses: ./.github/actions/gdextension-build
+        with:
+          platform: windows
+          target: ${{ matrix.target }}
+          scons-flags: arch=${{ matrix.arch }}
+          fmod-version: ${{ inputs.fmod-version }}
+      - uses: ./.github/actions/scons-cache
+        if: always()
+        with:
+          mode: save
+          name: windows-${{ matrix.target }}-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}_windows_${{ matrix.arch }}
+          path: |
+            demo/addons/fmod/libs/windows
+          if-no-files-found: error

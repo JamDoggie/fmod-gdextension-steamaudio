@@ -5,7 +5,7 @@ In this guide we'll explore how to play Fmod events.
 ## FmodEventEmitter nodes
 
 `FmodEventEmitter2D` and `FmodEventEmitter3D` are nodes which play Fmod events.
-Events and their parameters are loaded by id or name according to [Fmod General settings](./2-initialization.md#general).
+Events and their parameters are loaded by id or name according to the [Load by Name](../settings/1-general.md#load-by-name) setting.
 
 ![emitter-image]
 
@@ -50,6 +50,17 @@ emitter.set_parameter_by_id(5864137074015534804, 1000)
 
 emitter.get_parameter("RPM")
 emitter.get_parameter_by_id(5864137074015534804)
+```
+
+#### The event instance
+
+`get_event()` returns the `FmodEvent` the emitter plays, or `null` when it has none (before it is loaded, once it stopped and was released, and in the editor). One-shots played with `play_one_shot()` are separate instances and are not returned.
+`get_timeline_position()` and `set_timeline_position(position)` read and move the playhead of that event, in milliseconds.
+```gdscript
+$Music.set_timeline_position(30000)
+var event: FmodEvent = $Music.get_event()
+if event:
+    event.pitch = 1.5
 ```
 
 ### Signals
@@ -138,7 +149,7 @@ var event: FmodEvent = null
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	event = FmodServer.create_event_instance("event:/Vehicles/Car Engine")
-	event.set_2d_attributes(self.global_transform)
+	event.set_transform_2d(self.global_transform)
 	event.set_parameter_by_name("RPM", 600)
 	event.volume = 2
 	event.start()
@@ -172,7 +183,7 @@ var icon: Sprite2D
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	event = FmodServer.create_event_instance("event:/Music/Level 02")
-	event.set_callback(Callable(self, "change_color"), FmodServer.FMOD_STUDIO_EVENT_CALLBACK_ALL)
+	event.set_callback(Callable(self, "change_color"), FmodEvent.StudioEventCallbackType.ALL)
 	body_entered.connect(enter)
 	body_exited.connect(leave)
 	event.start()
@@ -190,7 +201,7 @@ func leave(_area):
 
 # warning-ignore:unused_argument
 func change_color(_dict: Dictionary, type: int):
-	if type == FmodServer.FMOD_STUDIO_EVENT_CALLBACK_TIMELINE_BEAT:
+	if type == FmodEvent.StudioEventCallbackType.TIMELINE_BEAT:
 		$icon.self_modulate = Color(randf_range(0,1), randf_range(0,1), randf_range(0,1), 1)
 ```
 
@@ -203,7 +214,7 @@ In order to play a programmer callback you must load the bank with audio table c
 then you can use `set_programmer_callback` to specify key from audio table to use.
 
 ```gdscript
-FmodServer.load_bank("res://assets/Banks/Dialogue_EN.bank", FmodServer.FMOD_STUDIO_LOAD_BANK_NORMAL)
+FmodServer.load_bank("res://assets/Banks/Dialogue_EN.bank", FmodBank.StudioLoadBankFlags.NORMAL)
 var event_instance = FmodServer.create_event_instance("event:/Character/Dialogue") # event from sfx bank.
 event_instance.set_programmer_callback("welcome") # welcome key in audio table from Dialogue bank.
 event_instance.start()

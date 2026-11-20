@@ -1,15 +1,15 @@
 
 #include "fmod_cache.h"
 
-#include "helpers/common.h"
 #include "classes/project_settings.hpp"
+#include "helpers/common.h"
+#include "variant/char_string.hpp"
 
 using namespace godot;
 
 FmodCache::FmodCache(FMOD::Studio::System* p_system, FMOD::System* p_core_system) :
-    system(p_system), core_system(p_core_system) {
-
-}
+  system(p_system),
+  core_system(p_core_system) {}
 
 FmodCache::~FmodCache() {
     system = nullptr;
@@ -20,12 +20,12 @@ void FmodCache::update_pending() {
     if (loading_banks.size() == 0) { return; }
     List<Ref<FmodBank>> to_delete;
     for (const Ref<FmodBank>& loading_bank : loading_banks) {
-        int loading_state = loading_bank->get_loading_state();
-        if (loading_state == FMOD_STUDIO_LOADING_STATE_LOADED) {
+        FmodBank::StudioLoadingState loading_state = loading_bank->get_loading_state();
+        if (loading_state == FmodBank::LOADED) {
             _get_bank_data(loading_bank);
             banks[loading_bank->get_godot_res_path()] = loading_bank.ptr();
             to_delete.push_back(loading_bank);
-        } else if (loading_state == FMOD_STUDIO_LOADING_STATE_ERROR) {
+        } else if (loading_state == FmodBank::ERROR) {
             to_delete.push_back(loading_bank);
             GODOT_LOG_ERROR("Fmod Sound System: Error loading bank.")
         }
@@ -78,13 +78,15 @@ Ref<FmodBank> FmodCache::get_bank(const String& bankPath) {
 #ifndef IOS_ENABLED
 
 uint32_t FmodCache::add_plugin(const String& p_plugin_path, uint32_t p_priority) {
-    uint32_t handle;
+    uint32_t handle = 0xFFFFFFFF;
 #if defined(ANDROID_ENABLED) && !defined(TOOLS_ENABLED)
-    const char* plugin_path = p_plugin_path.utf8().get_data();
+    CharString plugin_path = p_plugin_path.utf8();
 #else
-    const char* plugin_path = ProjectSettings::get_singleton()->globalize_path(p_plugin_path).utf8().get_data();
+    CharString plugin_path = ProjectSettings::get_singleton()->globalize_path(p_plugin_path).utf8();
 #endif
-    ERROR_CHECK(core_system->loadPlugin(plugin_path, &handle, p_priority));
+    if (!ERROR_CHECK_WITH_REASON(core_system->loadPlugin(plugin_path.get_data(), &handle, p_priority), vformat("Cannot load plugin %s", p_plugin_path))) {
+        return 0xFFFFFFFF;
+    }
     plugin_handles.append(handle);
     return handle;
 }
@@ -109,38 +111,6 @@ void FmodCache::remove_plugin(uint32_t p_plugin_handle) {
 
     ERROR_CHECK(core_system->unloadPlugin(p_plugin_handle));
     plugin_handles.erase(p_plugin_handle);
-}
-
-
-Ref<FmodFile> FmodCache::add_file(const String& file_path, unsigned int flag) {
-    FMOD::System* core = nullptr;
-    ERROR_CHECK(system->getCoreSystem(&core));
-
-    FMOD::Sound* sound = nullptr;
-    ERROR_CHECK_WITH_REASON(core->createSound(file_path.utf8().get_data(), flag, nullptr, &sound), vformat("Cannot create sound %s", file_path));
-    if (sound) {
-        Ref<FmodFile> ref = FmodFile::create_ref(sound);
-        files[file_path] = ref;
-        GODOT_LOG_VERBOSE("FMOD Sound System: LOADING AS SOUND FILE" + String(file_path))
-        return ref;
-    }
-    return {};
-}
-
-bool FmodCache::has_file(const String& filePath) {
-    return files.find(filePath).operator bool();
-}
-
-Ref<FmodFile> FmodCache::get_file(const String& filePath) {
-    return files.get(filePath);
-}
-
-void FmodCache::remove_file(const String& filePath) {
-    if (files.has(filePath)) {
-        Ref<FmodFile> ref = files[filePath];
-        ERROR_CHECK(ref->get_wrapped()->release());
-        files.erase(filePath);
-    }
 }
 
 bool FmodCache::has_vca_guid(const FMOD_GUID& guid) {
@@ -168,11 +138,7 @@ bool FmodCache::has_event_path(const String& eventPath) {
 }
 
 Ref<FmodVCA> FmodCache::get_vca(const FMOD_GUID& guid) {
-    if (
-            HashMap<FMOD_GUID, Ref<FmodVCA>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator{
-                    vcas.find(guid)
-            }
-    ) {
+    if (HashMap<FMOD_GUID, Ref<FmodVCA>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator {vcas.find(guid)}) {
         return iterator->value;
     }
 
@@ -196,11 +162,7 @@ Ref<FmodVCA> FmodCache::get_vca(const String& vca_path) {
 }
 
 Ref<FmodBus> FmodCache::get_bus(const FMOD_GUID& guid) {
-    if (
-            HashMap<FMOD_GUID, Ref<FmodBus>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator{
-                    buses.find(guid)
-            }
-    ) {
+    if (HashMap<FMOD_GUID, Ref<FmodBus>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator {buses.find(guid)}) {
         return iterator->value;
     }
 
@@ -226,7 +188,7 @@ Ref<FmodBus> FmodCache::get_bus(const String& bus_path) {
 Ref<FmodEventDescription> FmodCache::get_event(const FMOD_GUID& guid) {
     if (
       HashMap<FMOD_GUID, Ref<FmodEventDescription>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator {
-          event_descriptions.find(guid)
+        event_descriptions.find(guid)
       }
     ) {
         return iterator->value;
@@ -252,19 +214,17 @@ Ref<FmodEventDescription> FmodCache::get_event(const String& eventPath) {
 }
 
 FMOD_GUID FmodCache::get_event_guid(const String& event_path) {
-    if (HashMap<String, FMOD_GUID>::Iterator iterator {strings_to_guid.find(event_path)}) {
-        return iterator->value;
-    }
+    if (HashMap<String, FMOD_GUID>::Iterator iterator {strings_to_guid.find(event_path)}) { return iterator->value; }
 
     return {};
 }
 
 String FmodCache::get_event_path(const FMOD_GUID& guid) {
     if (
-            HashMap<FMOD_GUID, Ref<FmodEventDescription>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator{
-                    event_descriptions.find(guid)
-            }
-            ) {
+      HashMap<FMOD_GUID, Ref<FmodEventDescription>, FmodGuidHashMapHasher, FmodGuidHashMapComparer>::Iterator iterator {
+        event_descriptions.find(guid)
+      }
+    ) {
         return iterator->value->get_path();
     }
 
@@ -288,17 +248,17 @@ void FmodCache::_get_bank_data(Ref<FmodBank> bank) {
     for (Ref<FmodBus> bus : bank->get_buses()) {
         FMOD_GUID guid {bus->get_guid()};
         buses[guid] = bus;
-        strings_to_guid[bus->get_path()] = guid;
+        if (!bus->get_path().is_empty()) { strings_to_guid[bus->get_path()] = guid; }
     }
     for (Ref<FmodVCA> vca : bank->get_vcas()) {
         FMOD_GUID guid {vca->get_guid()};
         vcas[guid] = vca;
-        strings_to_guid[vca->get_path()] = guid;
+        if (!vca->get_path().is_empty()) { strings_to_guid[vca->get_path()] = guid; }
     }
     for (Ref<FmodEventDescription> desc : bank->get_event_descriptions()) {
         FMOD_GUID guid {desc->get_guid()};
         event_descriptions[guid] = desc;
-        strings_to_guid[desc->get_path()] = guid;
+        if (!desc->get_path().is_empty()) { strings_to_guid[desc->get_path()] = guid; }
     }
 }
 

@@ -1,60 +1,79 @@
-extends "res://addons/gut/test.gd"
+extends GdUnitTestSuite
 
-class TestBank:
-	extends "res://addons/gut/test.gd"
-	
-	var sprite: Sprite2D = Sprite2D.new()
-	
-	var master_strings_bank: FmodBank
-	var masterBank: FmodBank
-	var musicBank: FmodBank
-	var vehicleBank: FmodBank
-	
-	func before_all():
-		# load banks
-		# warning-ignore:return_value_discarded
-		master_strings_bank = FmodServer.load_bank("res://assets/Banks/Master.strings.bank", FmodServer.FMOD_STUDIO_LOAD_BANK_NORMAL)
-		# warning-ignore:return_value_discarded
-		masterBank = FmodServer.load_bank("res://assets/Banks/Master.bank", FmodServer.FMOD_STUDIO_LOAD_BANK_NORMAL)
-		# warning-ignore:return_value_discarded
-		musicBank = FmodServer.load_bank("res://assets/Banks/Music.bank", FmodServer.FMOD_STUDIO_LOAD_BANK_NORMAL)
-		# warning-ignore:return_value_discarded
-		vehicleBank = FmodServer.load_bank("res://assets/Banks/Vehicles.bank", FmodServer.FMOD_STUDIO_LOAD_BANK_NORMAL)
-		var desired_value = FmodServer.FMOD_STUDIO_LOADING_STATE_LOADED
-		assert_eq(vehicleBank.get_loading_state(), desired_value, "Loading state should be FMOD_STUDIO_LOADING_STATE_LOADED")
-		FmodServer.set_listener_number(1)
-		get_tree().get_root().add_child(sprite)
-		FmodServer.add_listener(0, sprite)
-	
-	func after_all():
-		FmodServer.remove_listener(0, sprite)
-	
-	func test_assert_bank_bus_count():
-		var desiredValue: int = 0
-		assert_eq(musicBank.get_bus_count(), desiredValue, "Music bank should have " + str(desiredValue) + " buses")
-		desiredValue = 12
-		assert_eq(masterBank.get_bus_count(), desiredValue, "Master bank should have " + str(desiredValue) + " buses")
-		desiredValue = 0
-		assert_eq(vehicleBank.get_bus_count(), desiredValue, "Vehicles bank should have " + str(desiredValue) + " buses")
-	
-	func test_assert_bank_event_count():
-		var desiredValue: int = 4
-		assert_eq(musicBank.get_event_description_count(), desiredValue, "Music bank should have " + str(desiredValue) + " events")
-		desiredValue = 5
-		assert_eq(masterBank.get_event_description_count(), desiredValue, "Master bank should have " + str(desiredValue) + " events")
-		desiredValue = 2
-		assert_eq(vehicleBank.get_event_description_count(), desiredValue, "Vehicles bank should have " + str(desiredValue) + " events")
-	
-	func test_assert_bank_string_count():
-		var desiredValue: int = 0
-		assert_eq(musicBank.get_string_count(), desiredValue, "Music bank should have " + str(desiredValue) + " strings")
-		assert_eq(masterBank.get_string_count(), desiredValue, "Master bank should have " + str(desiredValue) + " strings")
-		assert_eq(vehicleBank.get_string_count(), desiredValue, "Vehicles bank should have " + str(desiredValue) + " strings")
-	
-	func test_assert_bank_vca_count():
-		var desiredValue: int = 0
-		assert_eq(musicBank.get_VCA_count(), desiredValue, "Music bank should have " + str(desiredValue) + " VCAs")
-		desiredValue = 3
-		assert_eq(masterBank.get_VCA_count(), desiredValue, "Master bank should have " + str(desiredValue) + " VCAs")
-		desiredValue = 0
-		assert_eq(vehicleBank.get_VCA_count(), desiredValue, "Vehicles bank should have " + str(desiredValue) + " VCAs")
+var sprite: Sprite2D
+
+var master_strings_bank: FmodBank
+var masterBank: FmodBank
+var musicBank: FmodBank
+var vehicleBank: FmodBank
+
+func before():
+	master_strings_bank = FmodServer.load_bank("res://assets/Banks/Master.strings.bank", FmodBank.StudioLoadBankFlags.NORMAL)
+	masterBank = FmodServer.load_bank("res://assets/Banks/Master.bank", FmodBank.StudioLoadBankFlags.NORMAL)
+	musicBank = FmodServer.load_bank("res://assets/Banks/Music.bank", FmodBank.StudioLoadBankFlags.NORMAL)
+	vehicleBank = FmodServer.load_bank("res://assets/Banks/Vehicles.bank", FmodBank.StudioLoadBankFlags.NORMAL)
+	FmodServer.set_listener_number(1)
+	sprite = Sprite2D.new()
+	get_tree().get_root().add_child(sprite)
+	FmodServer.add_listener(0, sprite)
+
+func after():
+	FmodServer.remove_listener(0, sprite)
+	sprite.free()
+
+func test_assert_bank_loaded():
+	assert_int(vehicleBank.get_loading_state()).is_equal(FmodBank.StudioLoadingState.LOADED)
+
+func test_assert_bank_bus_count():
+	assert_int(musicBank.get_bus_count()).is_equal(0)
+	assert_int(masterBank.get_bus_count()).is_equal(12)
+	assert_int(vehicleBank.get_bus_count()).is_equal(0)
+
+func test_assert_bank_event_count():
+	assert_int(musicBank.get_event_description_count()).is_equal(4)
+	assert_int(masterBank.get_event_description_count()).is_equal(5)
+	assert_int(vehicleBank.get_event_description_count()).is_equal(2)
+
+func test_assert_bank_string_count():
+	assert_int(musicBank.get_string_count()).is_equal(0)
+	assert_int(masterBank.get_string_count()).is_equal(0)
+	assert_int(vehicleBank.get_string_count()).is_equal(0)
+
+func test_assert_bank_vca_count():
+	assert_int(musicBank.get_vca_count()).is_equal(0)
+	assert_int(masterBank.get_vca_count()).is_equal(3)
+	assert_int(vehicleBank.get_vca_count()).is_equal(0)
+
+func test_bank_sample_data():
+	vehicleBank.load_sample_data()
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.LOADED)
+	vehicleBank.unload_sample_data()
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.UNLOADED)
+
+func test_bank_loader_preloads_sample_data():
+	var loader := FmodBankLoader.new()
+	loader.bank_paths = [vehicleBank.get_godot_res_path()]
+	loader.preload_sample_data = true
+	get_tree().get_root().add_child(loader)
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.LOADED)
+
+	loader.bank_paths = []
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.UNLOADED)
+
+	loader.bank_paths = [vehicleBank.get_godot_res_path()]
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.LOADED)
+
+	loader.preload_sample_data = false
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.UNLOADED)
+
+	loader.preload_sample_data = true
+	get_tree().get_root().remove_child(loader)
+	FmodServer.wait_for_all_loads()
+	assert_int(vehicleBank.get_sample_loading_state()).is_equal(FmodBank.StudioLoadingState.UNLOADED)
+	loader.free()

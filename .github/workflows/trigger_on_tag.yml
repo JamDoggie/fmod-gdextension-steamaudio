@@ -1,0 +1,218 @@
+name: 🚀 Release
+on:
+  push:
+    tags:
+      - '*.*.*-*.*.*'
+
+env:
+  # Mirrored by the jobs' inputs below through YAML anchors, since a reusable workflow call cannot read env.
+  GODOT_VERSION: &godot_version 4.6.3-stable
+  FMOD_VERSION: &fmod_version '20400'
+  # The version that built the Godot web export templates: a side module built with another one can fail to load.
+  EMSCRIPTEN_VERSION: &emscripten_version 4.0.20
+
+jobs:
+  fmod-sdk:
+    name: 🎵 FMOD SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/fmod-sdk-cache
+        with:
+          mode: check
+          fmod-version: *fmod_version
+
+  check-specs:
+    name: 📜 Check specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python specs/check_specs.py
+
+  build-linux:
+    name: 🐧 Build Linux
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      fmod-version: *fmod_version
+
+  build-windows:
+    name: 🪟 Build Windows
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_windows.yml
+    with:
+      fmod-version: *fmod_version
+
+  build-macos:
+    name: 🍎 Build macOS
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_macos.yml
+    with:
+      fmod-version: *fmod_version
+
+  build-android:
+    name: 🤖 Build Android
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_android.yml
+    with:
+      fmod-version: *fmod_version
+
+  build-ios:
+    name: 🍏 Build iOS
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_ios.yml
+    with:
+      fmod-version: *fmod_version
+
+  build-web:
+    name: 🌐 Build Web
+    needs: fmod-sdk
+    uses: ./.github/workflows/build_web.yml
+    with:
+      fmod-version: *fmod_version
+      emscripten-version: *emscripten_version
+
+  assemble-linux:
+    name: 🐧 Assemble Linux
+    needs: build-linux
+    uses: ./.github/workflows/assemble_libraries.yml
+    with:
+      platform: linux
+
+  assemble-windows:
+    name: 🪟 Assemble Windows
+    needs: build-windows
+    uses: ./.github/workflows/assemble_libraries.yml
+    with:
+      platform: windows
+
+  assemble-macos:
+    name: 🍎 Assemble macOS
+    needs: build-macos
+    uses: ./.github/workflows/assemble_libraries.yml
+    with:
+      platform: macos
+
+  assemble-android:
+    name: 🤖 Assemble Android
+    needs: build-android
+    uses: ./.github/workflows/assemble_android.yml
+    with:
+      godot-version: *godot_version
+
+  assemble-ios:
+    name: 🍏 Assemble iOS
+    needs: build-ios
+    uses: ./.github/workflows/assemble_ios.yml
+
+  assemble-web:
+    name: 🌐 Assemble Web
+    needs: build-web
+    uses: ./.github/workflows/assemble_libraries.yml
+    with:
+      platform: web
+
+  test-linux:
+    name: 🐧 Test Linux
+    needs: assemble-linux
+    uses: ./.github/workflows/test_desktop.yml
+    with:
+      godot-version: *godot_version
+      platform: linux
+
+  test-windows:
+    name: 🪟 Test Windows
+    needs: assemble-windows
+    uses: ./.github/workflows/test_desktop.yml
+    with:
+      godot-version: *godot_version
+      platform: windows
+
+  test-macos:
+    name: 🍎 Test macOS
+    needs: assemble-macos
+    uses: ./.github/workflows/test_desktop.yml
+    with:
+      godot-version: *godot_version
+      platform: macos
+
+  test-editor-monkey:
+    name: 🐒 Editor monkey
+    needs: assemble-linux
+    uses: ./.github/workflows/test_editor_monkey.yml
+    with:
+      godot-version: *godot_version
+
+  test-android:
+    name: 🤖 Test Android
+    needs: [assemble-android, assemble-linux]
+    uses: ./.github/workflows/test_android.yml
+    with:
+      godot-version: *godot_version
+
+  test-ios:
+    name: 🍏 Test iOS
+    needs: [assemble-ios, assemble-macos]
+    uses: ./.github/workflows/test_ios.yml
+    with:
+      godot-version: *godot_version
+
+  test-web:
+    name: 🌐 Test Web
+    needs: [assemble-web, assemble-linux]
+    uses: ./.github/workflows/test_web.yml
+    with:
+      godot-version: *godot_version
+
+  assemble-addon:
+    name: 📦 Package addon
+    needs:
+      - assemble-linux
+      - assemble-windows
+      - assemble-macos
+      - assemble-android
+      - assemble-ios
+      - assemble-web
+      - test-linux
+      - test-windows
+      - test-macos
+      - test-editor-monkey
+      - test-android
+      - test-ios
+      - test-web
+    uses: ./.github/workflows/assemble_addon.yml
+
+  release:
+    name: 🚀 Publish release
+    needs: [check-specs, assemble-addon]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: fmod-addon
+          path: package
+
+      - name: Zip addon
+        run: cd package && zip -r ../addons.zip addons
+
+      # The demo project with the released addon, without the tests and their tooling.
+      - name: Zip demo project
+        run: |
+          rm -rf demo/addons/fmod demo/addons/gdUnit4 demo/test demo/test_runner demo/editor_monkey demo/run_tests.sh
+          cp -R package/addons/fmod demo/addons/fmod
+          sed -i 's|, "res://addons/gdUnit4/plugin.cfg"||' demo/project.godot
+          cd demo
+          zip -r ../demo.zip . -x '*/.gitignore' '.gitignore' '.godot/*' 'export/*' 'reports/*' 'android/*'
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" addons.zip demo.zip --title "Release $GITHUB_REF_NAME" --verify-tag

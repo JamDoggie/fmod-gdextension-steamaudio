@@ -6,14 +6,21 @@
 This addon supports FMOD plugins.  
 First you'll need to add plugins libraries (`.dll`, `.dylib`, `.so`, `.a`) in a project's folder.  
 In this documentation we will use `assets/plugins` as an example.  
-In this directory you have to create one directory per os, like:  
+In this directory you have to create one directory per os, and one per architecture inside the `windows` and `linux`
+ones, like:  
 ```
 assets
 └───── plugins
        ├────── windows
-       │       └────── .dll for windows goes here
+       │       ├────── x86_64
+       │       │       └────── .dll for windows x86_64 goes here
+       │       └────── arm64
+       │               └────── .dll for windows arm64 goes here
        ├────── linux
-       │       └────── .so for linux goes here
+       │       ├────── x86_64
+       │       │       └────── .so for linux x86_64 goes here
+       │       └────── arm64
+       │               └────── .so for linux arm64 goes here
        ├────── macos
        │       └────── .dylib for macos goes here
        ├────── android
@@ -46,10 +53,16 @@ plugin it will be:
 Here is what the configuration looks like for this example:  
 ![fmod-plugins-settings-resource]
 
-Then you have to set the path of this resource in project's settings, in the `Fmod/Plugins` section:  
+Then set the path of this resource in Project Settings, as [Fmod → Plugins → Configuration](../settings/5-plugins.md):  
 ![plugins-project-settings]
+
+## Web
+
+FMOD plugins are not available in web exports: FMOD's web runtime cannot load plugin libraries. A web export reports
+an error for each plugin declared in the `Dynamic Plugin List`, and banks whose events use a plugin fail to load, so
+keep plugin effects out of the banks of a game that ships on the web.
 
 
 [plugins-create-settings-resource]: ./assets/plugins-create-settings-resource.png
 [fmod-plugins-settings-resource]: ./assets/fmod-plugins-settings-resource.png
-[plugins-project-settings]: ./assets/plugins-project-settings.png
+[plugins-project-settings]: ../settings/assets/settings-plugins.png
